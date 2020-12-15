@@ -10,4 +10,5 @@ To create log file: journalctl -u escape_pod.service -f > testlog.txt
 **TODO**
 * Spawn process to create logfile from the script
 * Allow users to enter commands rather than use a list?
+* Add expected intent as an attribute of the command list to enable auto-matching of successful interactions
 
