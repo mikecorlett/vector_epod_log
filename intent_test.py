@@ -3,18 +3,12 @@ import json
 import tail
 
 file_to_watch = 'testlog.txt'
-request_file = 'commands.txt'
+cmd_file = 'commands.json'
 csv_file = 'results.csv'
 
-pattern = re.compile( r"{.*}" )
+current_cmd = None
 
-def next_request():
-    f = open( request_file, 'r' )
-    for line in f:
-        yield line.rstrip()
-    
-    close(f)
-    return None
+pattern = re.compile( r"{.*}" )
 
 def help():
     print("Commands")
@@ -49,7 +43,7 @@ def decision():
 
 
 def match_intent( l ):
-    global current_request
+    global current_cmd
     if not 'incoming_text' in l:
         return
 
@@ -60,33 +54,48 @@ def match_intent( l ):
         if len(txt):
             print('{}: {}'.format(j['incoming_text'], j['result_intent']))
 
-            step = decision()
-            succ = step[0]
-            retry = step[1]
+            if current_cmd['intent'] == j['result_intent']:
+                print( "Good match" )
+                succ = "Y"
+                retry = False
+            else:
+                step = decision()
+                succ = step[0]
+                retry = step[1]
 
-            log_entry = '{},"{}","{}","{}","{}"\n'.format(j['time'],succ,current_request, j['incoming_text'], j['result_intent'])
+            log_entry = '{},"{}","{}","{}","{}"\n'.format(j['time'],succ,current_cmd['request'], j['incoming_text'], j['result_intent'])
             csv.write( log_entry )
 
             if not retry:
-                current_request = next( req_iterator )
-                if current_request is None:
+                current_cmd = next( cmd_iterator )
+                if current_cmd is None:
                     quit()
-                print( 'Next: {}'.format( current_request ))
+                intent_prompt(current_cmd)
             else:
-                print( 'Retry: {}'.format( current_request ))
-            
+                print( 'Retry: {}'.format( current_cmd['request'] ))
         else:
-            print( 'No incoming text, retry: {}'.format(current_request) )
+            print( 'No text, retry: {}'.format(current_cmd['request']) )
     else:
         print( 'No JSON' )
 
 
-req_iterator = next_request()
-current_request = next(req_iterator)
+def load_intents( intentfile ):
+    f = open(intentfile, 'r') 
+    idict = json.load(f)
+    return idict
+
+
+def intent_prompt( i ):
+    print( 'Intent:{} "{}"'.format(i['intent'], i['request']))
+
+cmd_list = load_intents(cmd_file)
+cmd_iterator = iter(cmd_list)
+
+current_cmd = next(cmd_iterator)
 csv = open( csv_file, 'w')
 
 help()
-print( "First request: {}".format( current_request ))
+intent_prompt(current_cmd)
 
 tl = tail.Tail(file_to_watch)
 tl.register_callback( match_intent )
